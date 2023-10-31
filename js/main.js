@@ -106,16 +106,31 @@ const marginRight = 20;
 const marginBottom = 30;
 const marginLeft = 40;
 
-function update(svg, xAxis, yAxis, xScale, yScale, games) {
+const categories = ['fun', 'innovation', 'theme', 'graphics', 'audio', 'humor', 'mood'];
+
+const colorScheme = d3.scaleOrdinal()
+    .domain(categories)
+    .range(d3.schemeSet2);
+
+function buildLinesData(games) {
+    return categories.map(category => ({
+        category,
+        values: games.map(g => ({
+            game: g.name,
+            value: g.ratings[category]
+        }))
+    }));
+}
+
+function update(xAxis, yAxis, xScale, yScale, bars, plots, line, games) {
     xScale.domain(games.map(d => d.name));
     xAxis.transition().duration(1000).call(d3.axisBottom(xScale));
 
-    const data = svg.selectAll("rect")
-        .data(games);
+    const barsData = bars.selectAll("rect").data(games);
 
-    data.enter()
+    barsData.enter()
         .append("rect")
-        .merge(data)
+        .merge(barsData)
             .attr("fill", "#69b3a2")
         .transition()
         .duration(1000)
@@ -124,8 +139,22 @@ function update(svg, xAxis, yAxis, xScale, yScale, games) {
             .attr("width", xScale.bandwidth())
             .attr("height", d => height - yScale(d.ratings.overall) - marginBottom);
 
-    data.exit()
-        .remove();
+    barsData.exit().remove();
+
+    const categoryData = buildLinesData(games);
+    const plotsData = plots.selectAll("path").data(categoryData);
+
+    plotsData.enter()
+        .append("path")
+        .merge(plotsData)
+            .attr("stroke", d => colorScheme(d.category))
+            .style("stroke-width", 4)
+            .style("fill", "none")
+        .transition()
+        .duration(1000)
+            .attr("d", d => line(d.values));
+
+    plotsData.exit().remove();
 }
 
 function init() {
@@ -153,9 +182,16 @@ function init() {
         .attr("transform", `translate(${marginLeft},0)`)
         .call(d3.axisLeft(yScale));
 
+    const bars = svg.append("g");
+    const plots = svg.append("g");
+
+    const line = d3.line()
+        .x(d => xScale(d.game) + xScale.bandwidth() / 2)
+        .y(d => yScale(d.value));
+
     document.getElementById('stats-plot').append(svg.node());
 
-    update(svg, xAxis, yAxis, xScale, yScale, data);
+    update(xAxis, yAxis, xScale, yScale, bars, plots, line, data);
 
     let b = true;
     document.addEventListener("keydown", e => {
@@ -163,9 +199,9 @@ function init() {
 
         b = !b;
         if (b) {
-            update(svg, xAxis, yAxis, xScale, yScale, data);
+            update(xAxis, yAxis, xScale, yScale, bars, plots, line, data);
         } else {
-            update(svg, xAxis, yAxis, xScale, yScale, new_data);
+            update(xAxis, yAxis, xScale, yScale, bars, plots, line, new_data);
         }
     });
 }
