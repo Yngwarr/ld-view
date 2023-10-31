@@ -122,7 +122,7 @@ function buildLinesData(games) {
     }));
 }
 
-function update(xAxis, yAxis, xScale, yScale, bars, plots, line, games) {
+function update(xAxis, yAxis, xScale, yScale, bars, plots, points, line, games) {
     xScale.domain(games.map(d => d.name));
     xAxis.transition().duration(1000).call(d3.axisBottom(xScale));
 
@@ -143,6 +143,7 @@ function update(xAxis, yAxis, xScale, yScale, bars, plots, line, games) {
 
     const categoryData = buildLinesData(games);
     const plotsData = plots.selectAll("path").data(categoryData);
+    const pointsData = points.selectAll("g").data(categoryData);
 
     plotsData.enter()
         .append("path")
@@ -155,11 +156,36 @@ function update(xAxis, yAxis, xScale, yScale, bars, plots, line, games) {
             .attr("d", d => line(d.values));
 
     plotsData.exit().remove();
+
+    const postPointsData = pointsData.enter()
+        .append("g")
+        .merge(pointsData)
+        .style("fill", d => colorScheme(d.category));
+
+    pointsData.exit().remove();
+
+    const pointsInnerData = postPointsData.selectAll("circle").data(d => d.values);
+
+    pointsInnerData.enter()
+        .append("circle")
+        .merge(pointsInnerData)
+            .attr("r", 5)
+            .attr("stroke", "white")
+        .transition()
+        .duration(1000)
+            .attr("cx", d => xScale(d.game) + xScale.bandwidth() / 2)
+            .attr("cy", d => yScale(d.value));
+
+    pointsInnerData.exit().remove();
 }
 
 function init() {
     data.sort((a, b) => a.event - b.event);
     new_data.sort((a, b) => a.event - b.event);
+
+    const svg = d3.create("svg")
+        .attr("width", width)
+        .attr("height", height);
 
     const xScale = d3.scaleBand()
         .domain(data.map(d => d.name))
@@ -170,10 +196,6 @@ function init() {
         .domain([0, 5])
         .range([height - marginBottom, marginTop]);
 
-    const svg = d3.create("svg")
-        .attr("width", width)
-        .attr("height", height);
-
     const xAxis = svg.append("g")
         .attr("transform", `translate(0,${height - marginBottom})`)
         .call(d3.axisBottom(xScale));
@@ -182,8 +204,9 @@ function init() {
         .attr("transform", `translate(${marginLeft},0)`)
         .call(d3.axisLeft(yScale));
 
-    const bars = svg.append("g");
-    const plots = svg.append("g");
+    const bars = svg.append("g").classed("bars", true);
+    const plots = svg.append("g").classed("plots", true);
+    const points = svg.append("g").classed("points", true);
 
     const line = d3.line()
         .x(d => xScale(d.game) + xScale.bandwidth() / 2)
@@ -191,7 +214,7 @@ function init() {
 
     document.getElementById('stats-plot').append(svg.node());
 
-    update(xAxis, yAxis, xScale, yScale, bars, plots, line, data);
+    update(xAxis, yAxis, xScale, yScale, bars, plots, points, line, data);
 
     let b = true;
     document.addEventListener("keydown", e => {
@@ -199,9 +222,9 @@ function init() {
 
         b = !b;
         if (b) {
-            update(xAxis, yAxis, xScale, yScale, bars, plots, line, data);
+            update(xAxis, yAxis, xScale, yScale, bars, plots, points, line, data);
         } else {
-            update(xAxis, yAxis, xScale, yScale, bars, plots, line, new_data);
+            update(xAxis, yAxis, xScale, yScale, bars, plots, points, line, new_data);
         }
     });
 }
